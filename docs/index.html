@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>crisp-game-lib</title>
+    <meta
+      name="viewport"
+      content="width=device-width, height=device-height,
+    user-scalable=no, initial-scale=1, maximum-scale=1"
+    />
+    <script src="https://unpkg.com/sounds-some-sounds@1.0.5/build/index.js"></script>
+    <script src="https://unpkg.com/gif-capture-canvas@1.1.0/build/index.js"></script>
+    <script src="https://unpkg.com/terser@4.6.11/dist/bundle.min.js"></script>
+    <script src="https://unpkg.com/pixi.js@5.3.0/dist/pixi.min.js"></script>
+    <script src="https://unpkg.com/pixi-filters@3.1.1/dist/pixi-filters.js"></script>
+    <script>
+      var module = {};
+    </script>
+    <script src="https://unpkg.com/lodash.clonedeep@4.5.0/index.js"></script>
+    <script src="bundle.js"></script>
+    <script>
+title = "Open the Door";
+
+description = 
+`
+ click  turn
+
+ double launch
+
+ hold   transform
+
+`;
+
+characters = [
+` 
+  rr
+  rr
+  rr
+ rrrr
+rrrrrr
+rrrrrr
+`,
+
+
+
+];
+
+const canvas ={
+	width: 100,
+	hight: 150,
+}
+
+
+
+
+options = {
+	viewSize: { x: canvas.width, y: canvas.hight },
+	theme: "pixel",
+	seed: 33,
+	//isPlayingBgm: true,
+};
+
+
+
+// declare player
+/**
+ * @typedef { object } player
+ * @property { Vector } pos
+ * @property { number } size
+ */
+let player;
+let player_speed;
+let player_speed_launch;
+let player_speed_sizeChange;
+let player_moveEnable;
+let player_maxSize;
+let player_y_validation;
+//door
+let door_pos;
+let door_offset;
+let door_isPassing;
+let hit_theDoor;
+
+// declare lock
+/**
+ * @typedef { object } lock
+ * @property { Vector } pos
+ * @property { number } size
+ */
+let lock;
+
+let stage_change;
+
+
+//for player control
+let firstClick;
+let secondClick;
+let twoClicksDuration;
+let holdDuration;
+let holdCheck_oneTime;
+
+//time event 
+let gobalTimer = 0;
+let currentTime;
+let waitTime;
+
+function update() {
+
+	//time event setup
+	gobalTimer++;
+	currentTime = (gobalTimer / 60).toFixed(3);
+
+
+	if(!ticks){
+
+
+		//init door 
+		door_pos = vec(10, 45);
+		door_offset = 1;
+		door_isPassing = false;
+
+		//init lock
+		lock = [];
+		player_maxSize = 30;
+
+		//init player
+		player = [];
+
+		player_moveEnable = true;
+		player_speed = 0.5;
+		player_speed_launch = -0.7;
+		player_speed_sizeChange = 0.5;
+
+		//control stage
+		stage_change = false;
+
+
+	}
+
+	//draw UI
+	if(currentTime % 5 <= 2){
+		for(let i = 0; i < 6 ; i++){
+		color("purple");
+		text("O", 3, 15 + i * 22);
+		color("cyan");
+		text("O", 3, 25 + i * 22);
+
+		color("purple");
+		text("O", 95, 15 + i * 22);
+		color("cyan");
+		text("O", 95, 25 + i * 22);
+
+		color("purple");
+		text("O", 3 + i * 23, 145);
+		color("cyan");
+		text("O", 13 + i * 23, 145);
+
+	}
+
+	}else{
+		for(let i = 0; i < 6 ; i++){
+		color("cyan");
+		text("O", 3, 15 + i * 22);
+		color("purple");
+		text("O", 3, 25 + i * 22);
+
+		color("cyan");
+		text("O", 95, 15 + i * 22);
+		color("purple");
+		text("O", 95, 25 + i * 22);
+
+		color("cyan");
+		text("O", 3 + i * 23, 145);
+		color("purple");
+		text("O", 13 + i * 23, 145);
+
+	}
+
+	}
+
+
+		//end game if your score is too bad
+		if(score <= -100){
+		end();
+	}
+
+
+
+
+	//draw door
+	color("light_black");
+	rect(door_pos, 80 , -35);
+
+
+
+	//generate lock and draw
+
+	if(lock.length == 0){
+		lock.push({
+			pos: vec (rnd(door_pos.x + door_offset,
+			 80 - door_offset),
+			 30
+			 ),
+			size: rnd(15, player_maxSize),
+		});
+		door_isPassing = false;
+		hit_theDoor = false;
+	}
+
+
+	if(lock[0].pos.x + lock[0].size >= 90 - door_offset){
+		lock[0].pos = 
+		 	vec (rnd(door_pos.x + door_offset,
+			 80 - door_offset),
+			 30
+			 );
+			lock[0].size = rnd(15, player_maxSize);
+		
+	}else {
+		color("white");
+		rect(lock[0].pos, lock[0].size , 15);
+		color("red");
+		rect(lock[0].pos, lock[0].size , 1);
+	}
+
+
+
+	//draw player and remove case
+	remove(player, (p) => {
+		color("light_red");
+		const hitDoor = rect(player[0].pos, player[0].size, 3).isColliding.rect.light_black;
+		const hitLock = rect(player[0].pos, player[0].size, 3).isColliding.rect.red;
+		char("a", player[0].pos.x + player[0].size / 2, player[0].pos.y + 5);
+
+		if (player[0].pos.x > lock[0].pos.x
+			&& player[0].pos.x + player[0].size < lock[0].pos.x + lock[0].size) {
+			door_isPassing = true;
+			if (hitLock) {
+				color("red");
+				particle(50, 75,
+					400, // The number of particles
+					5, // The speed of the particles
+					PI, // The emitting angle
+					2 * PI  // The emitting width
+				);
+
+				play("coin");
+				//give score when hit the lock
+				addScore(Math.trunc(difficulty) * 100 * player[0].size / lock[0].size, canvas.width/2, canvas.hight/2 + 20);
+
+
+			}
+		} else {
+			door_isPassing = false;;
+		}
+		if (!door_isPassing) {
+			if (hitDoor) {
+
+				color("black");
+				particle(player[0].pos.x + player[0].size / 2, player[0].pos.y,
+					50, // The number of particles
+					2, // The speed of the particles
+					PI, // The emitting angle
+					2 * PI  // The emitting width
+				);
+
+				play("explosion");
+				addScore(-50, canvas.width/2, canvas.hight/2 + 20);
+				hit_theDoor = true;
+
+			}
+
+		}//hitCheck end
+
+		return (hitLock || hit_theDoor);
+	});
+
+
+
+
+	//player spawn
+	if (player.length == 0) {
+
+
+		//reset lock 
+		lock[0].pos =
+			vec(rnd(door_pos.x + door_offset,
+				80 - door_offset),
+				30
+			);
+		lock[0].size = rnd(15, player_maxSize);
+		door_isPassing = false;
+
+		if (lock[0].pos.x + lock[0].size >= 90 - door_offset) {
+			lock[0].pos =
+				vec(rnd(door_pos.x + door_offset,
+					80 - door_offset),
+					30
+				);
+			lock[0].size = rnd(15, player_maxSize);
+
+		} else {
+			color("white");
+			rect(lock[0].pos, lock[0].size, 15);
+			color("red");
+			rect(lock[0].pos, lock[0].size, 1);
+		}
+
+		player_y_validation = 65 * (difficulty * difficulty);
+		if(player_y_validation >= 130){
+			player_y_validation = 130;
+		}
+
+		player.push({
+			pos: vec(30, player_y_validation),
+			size: 10,
+		});
+		player_moveEnable = true;
+		hit_theDoor = false;
+
+		//give a increased speed 
+		console.log(player_speed);
+		if(player_speed <= 1){
+			player_speed = player_speed * difficulty;
+		}
+	}
+
+
+
+	//make player move normally
+	if (player.length != 0) {
+		if (player_moveEnable) {
+			//make player move
+			player[0].pos.x += player_speed;
+			//change direction when hit the bound
+			if (player[0].pos.x + player[0].size > 90 - door_offset || player[0].pos.x < 10 + door_offset) {
+				player_speed = -player_speed;
+			}
+		} else {
+			player[0].pos.y += player_speed_launch;
+		}
+
+
+	}//move end
+
+
+
+
+
+
+	if (input.isJustPressed) {
+		//first click = true means it's single click
+		if (!firstClick) {
+			firstClick = true;
+		} else {
+			//second click = true means it's double click
+			secondClick = true;
+			firstClick = false;
+		}
+	}
+	if (input.isPressed) {
+		holdDuration++;
+		//if u hold, it will run hold code instead of single/double click
+		if (holdDuration >= 15) {
+			//=====================================
+			//put your code for holding here
+			if (player.length != 0 && player[0].pos.x + player_maxSize < 90 - door_offset) {
+				
+				if(player[0].size >=  player_maxSize - 5 || player[0].size <=  7){
+					player_speed_sizeChange = -player_speed_sizeChange;
+				}
+				player[0].size += player_speed_sizeChange;
+
+			}
+
+
+			//=====================================
+			secondClick = false;
+			firstClick = false;
+		}
+	} else {
+		if (firstClick && twoClicksDuration < 7) {
+			twoClicksDuration++;
+		} else {
+			if (firstClick && holdDuration < 15) {
+				//=====================================
+				//put your code for single click here
+				player_speed = -player_speed;
+				play("jump");
+				//=====================================
+			}
+			if (secondClick && holdDuration < 15) {
+				//=====================================
+				//put your code for double click here		
+				player_moveEnable = false;
+				play("powerUp");
+				//=====================================
+				secondClick = false;
+			}
+			holdDuration = 0;
+			twoClicksDuration = 0;
+			firstClick = false;
+		}
+		holdCheck_oneTime = false;
+	}
+
+
+}
+
+
+      window.addEventListener("load", onLoad);
+    </script>
+  </head>
+  <body style="background: #ddd"></body>
+</html>
